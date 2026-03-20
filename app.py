@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import math
-import requests
 
 # --- 화면 기본 설정 ---
 st.set_page_config(page_title="나의 투자 시그널 봇", page_icon="📈")
@@ -29,13 +28,7 @@ with col2:
 if st.button("🚀 오늘의 액션 플랜 생성", use_container_width=True):
     with st.spinner('가격을 불러오는 중...'):
         try:
-            # [수정] 야후 파이낸스 차단(Rate Limit) 방지를 위해 크롬 브라우저인 척 위장
-            session = requests.Session()
-            session.headers.update(
-                {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'}
-            )
-            
-            stock = yf.Ticker(ticker, session=session)
+            stock = yf.Ticker(ticker)
             hist = stock.history(period="1d")
             
             if hist.empty:
