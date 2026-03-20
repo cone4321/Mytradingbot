@@ -123,32 +123,48 @@ def render_signal_ui(session_id, calc_shares, calc_avg, calc_day):
 def render_record_ui(session_id, file_path, history_df, calc_shares, calc_avg, profits_list, cum_profits_list):
     st.subheader(f"📝 세션 {session_id} 매매 기록 남기기")
     with st.form(f"record_form_{session_id}"):
-        c1, c2 = st.columns(2)
+        c1, c2, c3 = st.columns(3)
         with c1:
             r_date = st.date_input("체결 날짜", datetime.today(), key=f"r_date_{session_id}")
-            r_ticker = st.text_input("종목명", value="SOXL", key=f"r_ticker_{session_id}")
-            r_type = st.selectbox("매매 종류", ["매수", "매도", "배당/기타"], key=f"r_type_{session_id}")
         with c2:
-            r_qty = st.number_input("체결 수량 (주)", min_value=0, value=0, key=f"r_qty_{session_id}")
-            r_price = st.number_input("체결 가격 ($)", min_value=0.0, format="%.2f", key=f"r_price_{session_id}")
-            r_memo = st.text_input("메모 (선택)", key=f"r_memo_{session_id}")
+            r_ticker = st.text_input("종목명", value="SOXL", key=f"r_ticker_{session_id}")
+        with c3:
+            r_type = st.selectbox("매매 종류", ["매수", "매도", "배당/기타"], key=f"r_type_{session_id}")
+            
+        st.markdown("**▼ 체결 내역 (매수 시 2개의 주문 내역을 나누어 입력 가능. 체결 안 된 경우 0주 입력)**")
+        c4, c5 = st.columns(2)
+        with c4:
+            r_qty1 = st.number_input("체결 1 수량 (주)", min_value=0, value=0, key=f"r_qty1_{session_id}")
+            r_price1 = st.number_input("체결 1 가격 ($)", min_value=0.0, format="%.2f", key=f"r_price1_{session_id}")
+        with c5:
+            r_qty2 = st.number_input("체결 2 수량 (주)", min_value=0, value=0, key=f"r_qty2_{session_id}")
+            r_price2 = st.number_input("체결 2 가격 ($)", min_value=0.0, format="%.2f", key=f"r_price2_{session_id}")
+            
+        r_memo = st.text_input("메모 (선택)", key=f"r_memo_{session_id}")
         
         if st.form_submit_button("저장하기", use_container_width=True):
-            new_record = pd.DataFrame([{
-                "날짜": r_date.strftime("%Y-%m-%d"),
-                "종목": r_ticker.upper(),
-                "종류": r_type,
-                "수량": r_qty,
-                "가격": f"${r_price:.2f}",
-                "총액": f"${r_qty * r_price:.2f}",
-                "메모": r_memo
-            }])
-            curr_df = load_history(file_path)
-            curr_df = pd.concat([curr_df, new_record], ignore_index=True)
-            save_history(curr_df, file_path)
-            st.success(f"✅ 세션 {session_id} 매매 기록이 성공적으로 저장되었습니다.")
-            time.sleep(0.5)
-            st.rerun()
+            records_to_add = []
+            
+            # 체결 수량이 입력된 경우 리스트에 추가
+            if r_qty1 > 0:
+                records_to_add.append({"날짜": r_date.strftime("%Y-%m-%d"), "종목": r_ticker.upper(), "종류": r_type, "수량": r_qty1, "가격": f"${r_price1:.2f}", "총액": f"${r_qty1 * r_price1:.2f}", "메모": r_memo})
+            if r_qty2 > 0:
+                records_to_add.append({"날짜": r_date.strftime("%Y-%m-%d"), "종목": r_ticker.upper(), "종류": r_type, "수량": r_qty2, "가격": f"${r_price2:.2f}", "총액": f"${r_qty2 * r_price2:.2f}", "메모": r_memo})
+                
+            # 두 칸 모두 0주인데 매수인 경우 (날짜 카운트 증가용)
+            if r_qty1 == 0 and r_qty2 == 0 and r_type == "매수":
+                records_to_add.append({"날짜": r_date.strftime("%Y-%m-%d"), "종목": r_ticker.upper(), "종류": r_type, "수량": 0, "가격": "$0.00", "총액": "$0.00", "메모": r_memo if r_memo else "미체결 (날짜 진행)"})
+                
+            if len(records_to_add) > 0:
+                new_record = pd.DataFrame(records_to_add)
+                curr_df = load_history(file_path)
+                curr_df = pd.concat([curr_df, new_record], ignore_index=True)
+                save_history(curr_df, file_path)
+                st.success(f"✅ 세션 {session_id} 매매 기록이 성공적으로 저장되었습니다.")
+                time.sleep(0.5)
+                st.rerun()
+            else:
+                st.warning("수량을 1주 이상 입력하거나, '매수' 시 0주 상태로 저장해 날짜를 진행시키세요.")
 
     st.divider()
     st.subheader(f"📋 세션 {session_id} 전체 매매 내역")
