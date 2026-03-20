@@ -83,7 +83,7 @@ if not st.session_state['logged_in']:
         
         if submit_button:
             # 💡 이곳에서 원하는 아이디와 비밀번호를 설정하세요!
-            if username == "admin" and password == "1234": 
+            if username == "mjw5554" and password == "0618": 
                 st.session_state['logged_in'] = True
                 st.rerun() # 로그인 성공 시 화면 새로고침
             else:
