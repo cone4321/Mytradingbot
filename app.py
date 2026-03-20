@@ -131,7 +131,7 @@ with tab2:
                 "메모": r_memo
             }])
             history_df = load_history()
-            history_df = pd.concat([history_df, new_record], ignore_axis=True)
+            history_df = pd.concat([history_df, new_record], ignore_index=True)
             save_history(history_df)
             st.success("✅ 매매 기록이 성공적으로 저장되었습니다.")
 
