@@ -16,7 +16,7 @@ TABLE_NAME_2 = "session_2"
 def load_history(table_name):
     try:
         conn = st.connection("my_database", type="sql")
-        df = conn.query(f"SELECT * FROM {table_name}", ttl=0) # ttl=0: 캐시 없이 항상 최신 로드
+        df = conn.query(f"SELECT * FROM {table_name}", ttl=600) # [수정] 10분(600초) 캐시 적용하여 로드 속도 대폭 개선
         if df.empty or "날짜" not in df.columns:
             return pd.DataFrame(columns=["날짜", "종목", "종류", "수량", "가격", "총액", "메모"])
         return df
@@ -27,6 +27,12 @@ def load_history(table_name):
 def save_history(df, table_name):
     conn = st.connection("my_database", type="sql")
     df.to_sql(table_name, con=conn.engine, if_exists="replace", index=False)
+    st.cache_data.clear() # [추가] 덮어쓰기 후 기존 캐시 강제 삭제
+
+def append_history(df, table_name):
+    conn = st.connection("my_database", type="sql")
+    df.to_sql(table_name, con=conn.engine, if_exists="append", index=False)
+    st.cache_data.clear() # [추가] 기록 추가 후 기존 캐시 강제 삭제
 
 # --- 내 포트폴리오 상태 및 수익 계산 함수 ---
 def calculate_portfolio_state(df):
@@ -85,7 +91,7 @@ def render_signal_ui(session_id, calc_shares, calc_avg, calc_day):
         ticker = st.text_input("종목명", value="SOXL", key=f"ticker_{session_id}")
         max_days = st.number_input("최대 매수일 (Day)", value=25, key=f"max_days_{session_id}")
         default_day = min(int(calc_day), int(max_days))
-        current_day = st.number_input("현재 진행일 (처음 진입 시 0)", value=default_day, min_value=0, max_value=int(max_days), key=f"current_day_{session_id}")
+        current_day = st.number_input("현재 진행일 (매매 기록 기반 자동 반영)", value=default_day, min_value=0, max_value=int(max_days), key=f"current_day_{session_id}", disabled=True)
         avg_price = st.number_input("현재 내 평단가 ($)", value=float(calc_avg), format="%.2f", key=f"avg_price_{session_id}")
     with c2:
         total_cash = st.number_input("초기 총 투자금 ($)", value=10000.0, key=f"total_cash_{session_id}")
@@ -164,9 +170,7 @@ def render_record_ui(session_id, table_name, history_df, calc_shares, calc_avg, 
                 
             if len(records_to_add) > 0:
                 new_record = pd.DataFrame(records_to_add)
-                curr_df = load_history(table_name)
-                curr_df = pd.concat([curr_df, new_record], ignore_index=True)
-                save_history(curr_df, table_name)
+                append_history(new_record, table_name) # 기존 전체 데이터를 덮어쓰지 않고, 새 기록만 DB에 '추가'합니다.
                 st.success(f"✅ 세션 {session_id} 매매 기록이 성공적으로 저장되었습니다.")
                 time.sleep(0.5)
                 st.rerun()
@@ -175,12 +179,23 @@ def render_record_ui(session_id, table_name, history_df, calc_shares, calc_avg, 
 
     st.divider()
     
-    c_title, c_btn = st.columns([3, 1])
+    c_title, c_btn1, c_btn2 = st.columns([2, 1, 1])
     with c_title:
         st.subheader(f"📋 세션 {session_id} 전체 매매 내역")
-    with c_btn:
-        if st.button("🔄 드라이브에서 로드", key=f"reload_{session_id}"):
-            st.rerun() # ttl=0 설정으로 인해 rerun 시 즉시 시트 데이터를 다시 읽어옵니다.
+    with c_btn1:
+        if st.button("🔄 DB에서 새로고침", key=f"reload_{session_id}", use_container_width=True):
+            st.cache_data.clear() # [추가] 수동 새로고침 시 캐시 강제 삭제
+            st.rerun()
+    with c_btn2:
+        if st.button("↩️ 마지막 기록 취소", key=f"undo_{session_id}", use_container_width=True):
+            if not history_df.empty:
+                new_df = history_df.iloc[:-1] # 마지막 1줄을 제외한 데이터프레임 생성
+                save_history(new_df, table_name) # DB에 덮어쓰기
+                st.success("✅ 가장 최근 매매 기록 1건이 성공적으로 삭제되었습니다.")
+                time.sleep(0.5)
+                st.rerun()
+            else:
+                st.warning("삭제할 기록이 없습니다.")
     
     if not history_df.empty:
         total_cum = cum_profits_list[-1] if cum_profits_list else 0.0
