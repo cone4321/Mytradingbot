@@ -1,4 +1,5 @@
 streamlit
 yfinance
 pandas
-st-gsheets-connection
+SQLAlchemy
+psycopg2-binary
