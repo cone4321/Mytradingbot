@@ -91,13 +91,19 @@ def render_signal_ui(session_id, calc_shares, calc_avg, calc_day):
         ticker = st.text_input("종목명", value="SOXL", key=f"ticker_{session_id}")
         max_days = st.number_input("최대 매수일 (Day)", value=25, key=f"max_days_{session_id}")
         default_day = min(int(calc_day), int(max_days))
+        
+        # [추가] 매매 기록 변경 시, 화면 값에 과거 데이터가 남아있는 현상(Stuck)을 강제 초기화
+        st.session_state[f"current_day_{session_id}"] = default_day
+        st.session_state[f"avg_price_{session_id}"] = float(calc_avg)
+        st.session_state[f"held_shares_{session_id}"] = int(calc_shares)
+        
         current_day = st.number_input("현재 진행일 (매매 기록 기반 자동 반영)", value=default_day, min_value=0, max_value=int(max_days), key=f"current_day_{session_id}", disabled=True)
-        avg_price = st.number_input("현재 내 평단가 ($)", value=float(calc_avg), format="%.2f", key=f"avg_price_{session_id}")
+        avg_price = st.number_input("현재 내 평단가 ($) (자동 반영)", value=float(calc_avg), format="%.2f", key=f"avg_price_{session_id}", disabled=True)
     with c2:
         total_cash = st.number_input("초기 총 투자금 ($)", value=10000.0, key=f"total_cash_{session_id}")
         target_profit = st.number_input("목표 수익률 (%)", value=14.0, key=f"target_profit_{session_id}") / 100.0
         loc_pct = st.number_input("시가 대비 LOC 허용치 (%)", value=10.0, key=f"loc_pct_{session_id}") / 100.0
-        held_shares = st.number_input("현재 보유 수량 (주)", value=int(calc_shares), key=f"held_shares_{session_id}")
+        held_shares = st.number_input("현재 보유 수량 (주) (자동 반영)", value=int(calc_shares), key=f"held_shares_{session_id}", disabled=True)
 
     if st.button(f"🚀 세션 {session_id} 액션 플랜 생성", use_container_width=True, key=f"btn_action_{session_id}"):
         with st.spinner('가격을 불러오는 중...'):
